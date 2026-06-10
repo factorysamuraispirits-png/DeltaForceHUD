@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:transparent;font-family:'Courier New',monospace;overflow:hidden}
+#hud{position:fixed;top:16px;right:16px;text-align:right}
+#gain{font-size:40px;font-weight:bold;letter-spacing:2px;text-shadow:0 0 12px currentColor}
+.p{color:#00ff44}.m{color:#ff4444}.z{color:#aaa}
+#dot{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;margin-left:6px;vertical-align:middle}
+.live{background:#00ff44!important;animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+#logo{position:fixed;bottom:20px;right:20px;width:100px;height:100px;object-fit:contain;opacity:0.9}
+.bump{animation:bump .5s ease}
+@keyframes bump{0%{transform:scale(1)}30%{transform:scale(1.25)}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+<div id="hud"><div id="gain" class="z">---<span id="dot"></span></div></div>
+<img id="logo" src="/logo" alt="logo">
+<script>
+let cfg={gain:true,logo:true,fx:false};
+let lastGain=null;
+async function loadCfg(){
+  try{
+    const s=await(await fetch('/settings')).json();
+    cfg.gain=s.elements.gain.enabled;
+    cfg.logo=s.elements.logo.enabled;
+    cfg.fx=s.elements.gain.fx;
+    document.getElementById('hud').style.display=cfg.gain?'block':'none';
+    document.getElementById('logo').style.display=cfg.logo?'block':'none';
+  }catch(e){}
+}
+async function update(){
+  try{
+    const d=await(await fetch('/asset')).json();
+    const g=document.getElementById('gain');
+    const dot=document.getElementById('dot');
+    dot.className=d.running?'live':'';
+    if(!d.has_start){g.textContent=d.now_fmt||'---';g.className='z'}
+    else if(d.gain>0){g.textContent=d.gain_fmt;g.className='p'}
+    else if(d.gain<0){g.textContent=d.gain_fmt;g.className='m'}
+    else{g.textContent='0';g.className='z'}
+    g.appendChild(dot);
+    if(cfg.fx&&lastGain!==null&&d.gain!==lastGain){
+      g.classList.remove('bump');void g.offsetWidth;g.classList.add('bump');
+    }
+    lastGain=d.gain;
+  }catch(e){}
+}
+loadCfg();setInterval(loadCfg,5000);
+setInterval(update,2000);update();
+</script>
+</body>
+</html>

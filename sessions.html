@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delta Force HUD - セッション履歴</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Meiryo',sans-serif;padding:20px;line-height:1.6}
+.wrap{max-width:960px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.topbar h1{font-size:20px;flex:1}
+.topbar a{color:#8b949e;font-size:13px;text-decoration:none}
+.topbar a:hover{color:#e6edf3}
+.btn{background:#21262d;color:#e6edf3;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn:hover{background:#30363d}
+.btn.red{background:#b91c1c}.btn.red:hover{background:#dc2626}
+.btn.blue{background:#1f6feb;color:#fff}.btn.blue:hover{background:#388bfd}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px}
+.stat .label{font-size:11px;color:#8b949e;margin-bottom:4px}
+.stat .value{font-size:22px;font-weight:700;font-family:'Courier New',monospace}
+.stat .value.pos{color:#3fb950}.stat .value.neg{color:#f85149}.stat .value.neu{color:#8b949e}
+.chartbox{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;margin-bottom:20px}
+.chartbox h2{font-size:14px;color:#8b949e;margin-bottom:12px}
+canvas{width:100%!important;height:260px!important;display:block}
+.tablebox{background:#161b22;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-bottom:20px}
+.tablebox .head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #21262d}
+.tablebox .head h2{font-size:14px;color:#8b949e}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#0d1117;color:#8b949e;text-align:left;padding:8px 16px;font-weight:600;font-size:12px}
+td{padding:7px 16px;border-top:1px solid #161b22;font-family:'Courier New',monospace}
+tr:hover td{background:rgba(255,255,255,.03)}
+td.pos{color:#3fb950}td.neg{color:#f85149}
+.empty{text-align:center;padding:40px;color:#8b949e;font-size:14px}
+.range-note{font-size:12px;color:#8b949e;padding:8px 16px;border-top:1px solid #21262d}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>📊 セッション履歴</h1>
+    <a href="/setup">← 設定に戻る</a>
+    <button class="btn blue" onclick="loadData()">🔄 更新</button>
+    <button class="btn" onclick="exportCSV()">⬇ CSV出力</button>
+    <button class="btn red" onclick="clearLog()">🗑 ログ削除</button>
+  </div>
+  <div class="stats" id="stats">
+    <div class="stat"><div class="label">セッション開始</div><div class="value neu" id="s-start">---</div></div>
+    <div class="stat"><div class="label">現在値</div><div class="value neu" id="s-now">---</div></div>
+    <div class="stat"><div class="label">セッション収支</div><div class="value neu" id="s-gain">---</div></div>
+    <div class="stat"><div class="label">記録件数</div><div class="value neu" id="s-count">0</div></div>
+    <div class="stat"><div class="label">最高値</div><div class="value pos" id="s-max">---</div></div>
+    <div class="stat"><div class="label">最低値</div><div class="value neg" id="s-min">---</div></div>
+  </div>
+  <div class="chartbox"><h2>資産推移</h2><canvas id="chart"></canvas></div>
+  <div class="tablebox">
+    <div class="head"><h2>直近の記録</h2><span id="tableNote" style="font-size:12px;color:#8b949e"></span></div>
+    <div id="tableBody"></div>
+    <div class="range-note" id="rangeNote"></div>
+  </div>
+</div>
+<script>
+let allEntries=[];
+function fmtVal(v){if(v==null)return'---';const a=Math.abs(v);if(a>=1e9)return(v/1e9).toFixed(2)+'B';if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return(v/1e3).toFixed(1)+'K';return String(parseInt(v));}
+function fmtGain(v){if(v==null)return'---';const s=v>0?'+':v<0?'-':'';return s+fmtVal(Math.abs(v));}
+function fmtTime(iso){try{return iso.replace('T',' ');}catch(e){return iso;}}
+async function loadData(){
+  try{
+    const d=await(await fetch('/sessions')).json();
+    allEntries=d.entries||[];renderStats();drawChart();renderTable();
+  }catch(e){document.getElementById('tableBody').innerHTML='<div class="empty">サーバーに接続できません</div>';}
+}
+function renderStats(){
+  const e=allEntries;
+  if(!e.length){['s-start','s-now','s-gain','s-max','s-min'].forEach(id=>{document.getElementById(id).textContent='---';});document.getElementById('s-count').textContent='0';return;}
+  const vals=e.map(x=>x.v),first=vals[0],last=vals[vals.length-1],gain=last-first,max=Math.max(...vals),min=Math.min(...vals);
+  document.getElementById('s-start').textContent=fmtVal(first);
+  document.getElementById('s-now').textContent=fmtVal(last);
+  document.getElementById('s-count').textContent=e.length;
+  document.getElementById('s-max').textContent=fmtVal(max);
+  document.getElementById('s-min').textContent=fmtVal(min);
+  const gainEl=document.getElementById('s-gain');gainEl.textContent=fmtGain(gain);gainEl.className='value '+(gain>0?'pos':gain<0?'neg':'neu');
+}
+function drawChart(){
+  const canvas=document.getElementById('chart');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||800,H=260;
+  canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
+  const e=allEntries;
+  if(!e.length){ctx.fillStyle='#8b949e';ctx.textAlign='center';ctx.font='14px Segoe UI';ctx.fillText('データがありません',W/2,H/2);return;}
+  const PAD={t:20,r:20,b:36,l:72};
+  const vals=e.map(x=>x.v),times=e.map(x=>new Date(x.t).getTime());
+  let minV=Math.min(...vals),maxV=Math.max(...vals);
+  if(minV===maxV){minV-=1000;maxV+=1000;}
+  const minT=Math.min(...times),maxT=Math.max(...times);
+  const xS=t=>PAD.l+(maxT===minT?(W-PAD.l-PAD.r)/2:(t-minT)/(maxT-minT)*(W-PAD.l-PAD.r));
+  const yS=v=>H-PAD.b-(v-minV)/(maxV-minV)*(H-PAD.t-PAD.b);
+  for(let i=0;i<=4;i++){
+    const y=PAD.t+i*(H-PAD.t-PAD.b)/4,v=maxV-i*(maxV-minV)/4;
+    ctx.strokeStyle='#21262d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(W-PAD.r,y);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.textAlign='right';ctx.font='11px Courier New';ctx.fillText(fmtVal(v),PAD.l-6,y+4);
+  }
+  ctx.beginPath();e.forEach((pt,i)=>{i===0?ctx.moveTo(xS(times[i]),yS(vals[i])):ctx.lineTo(xS(times[i]),yS(vals[i]));});
+  ctx.lineTo(xS(times[times.length-1]),H-PAD.b);ctx.lineTo(xS(times[0]),H-PAD.b);ctx.closePath();
+  const grad=ctx.createLinearGradient(0,PAD.t,0,H-PAD.b);grad.addColorStop(0,'rgba(31,111,235,0.25)');grad.addColorStop(1,'rgba(31,111,235,0.02)');
+  ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.strokeStyle='#1f6feb';ctx.lineWidth=2;ctx.lineJoin='round';
+  e.forEach((pt,i)=>{i===0?ctx.moveTo(xS(times[i]),yS(vals[i])):ctx.lineTo(xS(times[i]),yS(vals[i]));});ctx.stroke();
+  ctx.fillStyle='#8b949e';ctx.font='11px Courier New';
+  ctx.textAlign='left';ctx.fillText(fmtTime(e[0].t).slice(11),PAD.l,H-8);
+  ctx.textAlign='right';ctx.fillText(fmtTime(e[e.length-1].t).slice(11),W-PAD.r,H-8);
+}
+function renderTable(){
+  const body=document.getElementById('tableBody'),e=allEntries;
+  if(!e.length){body.innerHTML='<div class="empty">記録がありません</div>';document.getElementById('rangeNote').textContent='';return;}
+  const rows=e.slice().reverse().slice(0,200);
+  document.getElementById('tableNote').textContent='最新 '+Math.min(200,e.length)+'件表示';
+  document.getElementById('rangeNote').textContent=e.length>200?'全 '+e.length+' 件中 直近 200 件を表示':'全 '+e.length+' 件';
+  let html='<table><tr><th>日時</th><th>資産</th><th>変化</th></tr>';
+  rows.forEach((pt,i)=>{
+    const prev=i<rows.length-1?rows[i+1].v:null,delta=prev!=null?pt.v-prev:null,cls=delta>0?'pos':delta<0?'neg':'';
+    html+='<tr><td>'+fmtTime(pt.t)+'</td><td>'+fmtVal(pt.v)+'</td><td class="'+cls+'">'+(delta!=null?fmtGain(delta):'—')+'</td></tr>';
+  });
+  html+='</table>';body.innerHTML=html;
+}
+function exportCSV(){
+  if(!allEntries.length){alert('データがありません');return;}
+  let csv='datetime,value
+';
+  allEntries.forEach(e=>{csv+=e.t+','+e.v+'
+';});
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='delta_force_session_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+async function clearLog(){
+  if(!confirm('セッションログを全件削除しますか？この操作は取り消せません。'))return;
+  await fetch('/sessions',{method:'DELETE'});allEntries=[];renderStats();drawChart();renderTable();
+}
+window.addEventListener('resize',()=>{if(allEntries.length)drawChart();});
+loadData();
+</script>
+</body>
+</html>

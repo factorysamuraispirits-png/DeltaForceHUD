@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delta Force HUD - 設定</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Meiryo',sans-serif;padding:20px;line-height:1.6}
+.wrap{max-width:880px;margin:0 auto}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:#8b949e;font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.sub a{color:#1f6feb;text-decoration:none;font-size:12px}
+.sub a:hover{text-decoration:underline}
+.progress{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px}
+.pchip{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;background:#0d1117;border:1px solid #30363d;color:#8b949e;transition:.2s}
+.pchip .pdot{width:8px;height:8px;border-radius:50%;background:#555;transition:.2s}
+.pchip.ok{color:#3fb950;border-color:#1f6f3a}
+.pchip.ok .pdot{background:#3fb950;box-shadow:0 0 6px #3fb950}
+.pchip.ng .pdot{background:#f85149}
+.pchip .ptag{font-size:10px;background:#1f6feb;color:#fff;padding:1px 6px;border-radius:8px;margin-left:2px}
+.pchip.manual .ptag{background:#6e7681}
+.pchip.manual{cursor:pointer;user-select:none}
+.pchip.manual:hover{background:#161b22}
+.card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:18px;margin-bottom:16px}
+.card h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.num{background:#1f6feb;color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+label{font-size:13px;color:#8b949e;display:block;margin-bottom:6px}
+select{background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:8px 10px;font-size:14px;width:100%}
+.btn{background:#238636;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.btn:hover{background:#2ea043}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.alt{background:#21262d}.btn.alt:hover{background:#30363d}
+.btn.blue{background:#1f6feb}.btn.blue:hover{background:#388bfd}
+.btn.red{background:#b91c1c}.btn.red:hover{background:#dc2626}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.previewbox{position:relative;width:100%;aspect-ratio:16/9;background:#000 center/100% 100% no-repeat;border:1px solid #30363d;border-radius:6px;overflow:hidden;user-select:none;margin-top:8px}
+#roi{position:absolute;border:2px solid #00ff66;background:rgba(0,255,102,0.12);cursor:move;box-shadow:0 0 0 9999px rgba(0,0,0,0.35)}
+#roiHandle{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#00ff66;border:2px solid #0d1117;border-radius:3px;cursor:nwse-resize}
+#anchor{position:absolute;border:2px dashed #1f9fff;background:rgba(31,159,255,0.12);cursor:move;display:none}
+#anchorHandle{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#1f9fff;border:2px solid #0d1117;border-radius:3px;cursor:nwse-resize}
+body.show-anchor #anchor{display:block}
+.gauge{height:20px;background:#0d1117;border:1px solid #30363d;border-radius:10px;overflow:hidden;position:relative;margin-top:8px}
+.gauge-fill{height:100%;background:#3fb950;width:0%;transition:width .3s}
+.gauge-thr{position:absolute;top:0;bottom:0;width:2px;background:#f85149}
+.lobby-ind{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-top:8px}
+.lobby-ind .ld{width:10px;height:10px;border-radius:50%;background:#555}
+.lobby-ind.on .ld{background:#3fb950;box-shadow:0 0 6px #3fb950}
+.lobby-ind.on{color:#3fb950}
+.lobby-ind.off{color:#8b949e}
+.coords{font-family:'Courier New',monospace;font-size:13px;color:#8b949e;margin-top:8px}
+.result{margin-top:12px;padding:12px;border-radius:6px;background:#0d1117;border:1px solid #30363d;display:none}
+.result.show{display:block}
+.result img{max-width:100%;border-radius:4px;margin-top:8px;image-rendering:pixelated}
+.ok-text{color:#3fb950;font-weight:700;font-size:18px}
+.ng-text{color:#f85149;font-weight:700;font-size:16px}
+.warn{background:#3d2a00;border:1px solid #9e6a00;color:#e3b341;padding:8px 12px;border-radius:6px;font-size:13px;margin-top:8px;display:none}
+.warn.show{display:block}
+.chk{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;color:#e6edf3}
+.chk input{width:18px;height:18px}
+.chk .tag{font-size:11px;color:#8b949e;background:#21262d;padding:1px 7px;border-radius:10px}
+.savebar{position:sticky;bottom:0;background:#0d1117;padding:14px 0;margin-top:8px;text-align:center;z-index:10}
+#saveMsg{color:#3fb950;font-size:13px;margin-left:10px}
+.hint{font-size:12px;color:#8b949e;margin-top:6px}
+.wizardbar{background:linear-gradient(135deg,#1f6feb,#388bfd);color:#fff;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.wizardbar .title{font-weight:600;font-size:15px}
+.wizardbar .step{font-size:12px;opacity:.9}
+.wizardbar .skip{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
+.wizardbar .skip:hover{background:rgba(255,255,255,.25)}
+.wiznav{display:flex;justify-content:space-between;margin-top:12px}
+body.wizard .normal-only{display:none}
+body:not(.wizard) .wizard-only{display:none}
+body:not(.wizard) .card{display:block}
+body.wizard .card[data-step]{display:none}
+body.wizard .card[data-step].active{display:block}
+.redo{margin-top:-8px;margin-bottom:14px;text-align:right}
+.redo a{color:#8b949e;font-size:12px;text-decoration:none;cursor:pointer}
+.redo a:hover{color:#e6edf3;text-decoration:underline}
+.toggle-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.toggle{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.slider{position:absolute;inset:0;background:#30363d;border-radius:11px;transition:.2s}
+.slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked + .slider{background:#238636}
+.toggle input:checked + .slider::before{transform:translateX(18px)}
+.toggle-label{font-size:13px;color:#e6edf3}
+.toggle-hint{font-size:11px;color:#8b949e}
+#camDetectResult{font-size:12px;color:#8b949e;margin-top:6px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Delta Force HUD 設定</h1>
+  <div class="sub">
+    ここで全部調整できます。終わったら OBS に <b>http://localhost:8765/</b> を貼るだけ。
+    <a href="/log" target="_blank">📊 セッション履歴を見る</a>
+  </div>
+
+  <div class="progress" id="progress">
+    <div class="pchip" data-key="camera"><span class="pdot"></span><span>カメラ接続</span><span class="ptag">自動</span></div>
+    <div class="pchip" data-key="ocr"><span class="pdot"></span><span>OCR成功</span><span class="ptag">自動</span></div>
+    <div class="pchip" data-key="start"><span class="pdot"></span><span>開始資産</span><span class="ptag">自動</span></div>
+    <div class="pchip manual" data-key="tesseract" onclick="showDepHelp('tesseract')"><span class="pdot"></span><span>Tesseract</span><span class="ptag">必須</span></div>
+    <div class="pchip manual" data-key="jpn" onclick="showDepHelp('jpn')"><span class="pdot"></span><span>日本語OCR</span><span class="ptag">ロビー判定</span></div>
+    <div class="pchip manual" data-key="obs" onclick="toggleManual('obs')"><span class="pdot"></span><span>OBS接続済</span><span class="ptag">手動</span></div>
+    <div class="pchip manual" data-key="hud" onclick="toggleManual('hud')"><span class="pdot"></span><span>HUD表示確認</span><span class="ptag">手動</span></div>
+  </div>
+
+  <div class="warn" id="helpTesseract">Tesseract が既定パスにありません。<a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank">UB-Mannheim版</a>を <b>C:\Program Files\Tesseract-OCR</b> に入れて start.bat を再起動してください。</div>
+  <div class="warn" id="helpJpn">日本語データ未配置。<a href="https://github.com/tesseract-ocr/tessdata_fast" target="_blank">tessdata_fast</a> の jpn.traineddata を <b>このフォルダの tessdata</b> に置いて start.bat を再起動してください。</div>
+
+  <div class="wizardbar wizard-only" id="wizardbar">
+    <div>
+      <div class="title">🎯 初回セットアップガイド</div>
+      <div class="step" id="wizardStep">STEP 1 / 5 — カメラ選択</div>
+    </div>
+    <button class="skip" onclick="skipWizard()">スキップして全画面表示</button>
+  </div>
+
+  <div class="redo normal-only">
+    <a onclick="restartWizard()">セットアップガイドをやり直す</a>
+  </div>
+
+  <div class="card active" data-step="1">
+    <h2><span class="num">1</span> カメラ選択</h2>
+    <label>OBS仮想カメラを選んでください（下のプレビューにゲームが映るものが正解）</label>
+    <div class="row">
+      <select id="cam" style="flex:1">
+        <option value="0">カメラ 0</option>
+        <option value="1">カメラ 1</option>
+        <option value="2">カメラ 2</option>
+        <option value="3">カメラ 3</option>
+        <option value="4">カメラ 4</option>
+        <option value="5">カメラ 5</option>
+      </select>
+      <button class="btn alt" onclick="detectCameras()" id="detectBtn">🔍 自動検出</button>
+    </div>
+    <div id="camDetectResult"></div>
+    <div class="warn" id="camWarn">カメラ映像が取得できません。OBSで「仮想カメラ開始」を押してください。</div>
+    <div class="wiznav wizard-only">
+      <span></span>
+      <button class="btn" onclick="nextStep()">次へ →</button>
+    </div>
+  </div>
+
+  <div class="card" data-step="2">
+    <h2><span class="num">2</span> 読み取り範囲</h2>
+    <label>緑の枠を資産の数字に合わせてください（枠の中央をドラッグで移動、右下の角でサイズ変更）</label>
+    <div class="previewbox" id="pv">
+      <div id="roi"><div id="roiHandle"></div></div>
+      <div id="anchor"><div id="anchorHandle"></div></div>
+    </div>
+    <div class="coords" id="coords">x:0.760 y:0.020 w:0.140 h:0.035</div>
+    <div class="hint">プレビューは約1秒ごとに更新されます。</div>
+    <div class="wiznav wizard-only">
+      <button class="btn alt" onclick="prevStep()">← 戻る</button>
+      <button class="btn" onclick="nextStep()">次へ →</button>
+    </div>
+  </div>
+
+  <div class="card" data-step="3">
+    <h2><span class="num">3</span> 読み取りテスト</h2>
+    <div class="row">
+      <button class="btn blue" onclick="ocrTest()">テスト実行</button>
+      <span class="hint">今の枠で資産が正しく読めるか確認します</span>
+    </div>
+    <div class="result" id="testResult"></div>
+    <div class="wiznav wizard-only">
+      <button class="btn alt" onclick="prevStep()">← 戻る</button>
+      <button class="btn" onclick="nextStep()">次へ →</button>
+    </div>
+  </div>
+
+  <div class="card" data-step="4">
+    <h2><span class="num">4</span> 開始資産</h2>
+    <div class="row">
+      <button class="btn" onclick="setStart()">現在値を開始資産にする</button>
+      <span class="hint" id="startMsg">配信開始時に押すと、そこからの収支を計算します</span>
+    </div>
+    <div class="wiznav wizard-only">
+      <button class="btn alt" onclick="prevStep()">← 戻る</button>
+      <button class="btn" onclick="nextStep()">次へ →</button>
+    </div>
+  </div>
+
+  <div class="card" data-step="5">
+    <h2><span class="num">5</span> 表示する要素</h2>
+    <div class="chk"><input type="checkbox" id="el_gain" checked><span>収支表示（右上）</span></div>
+    <div class="chk"><input type="checkbox" id="el_fx"><span>増減時に光る演出</span><span class="tag">演出</span></div>
+    <div class="chk"><input type="checkbox" id="el_logo" checked><span>ロゴ（右下）</span></div>
+    <div class="chk"><input type="checkbox" id="el_banner" disabled><span>スポンサーバナー</span><span class="tag">近日対応</span></div>
+    <hr style="border-color:#21262d;margin:14px 0">
+    <label style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:8px">Windows 起動時に自動開始</label>
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="startupToggle" onchange="toggleStartup()">
+        <span class="slider"></span>
+      </label>
+      <div>
+        <div class="toggle-label">Windows スタートアップに登録</div>
+        <div class="toggle-hint" id="startupHint">PC 起動時に HUD サーバーを自動起動します</div>
+      </div>
+    </div>
+    <div class="wiznav wizard-only">
+      <button class="btn alt" onclick="prevStep()">← 戻る</button>
+      <button class="btn" onclick="finishWizard()">セットアップ完了 ✓</button>
+    </div>
+  </div>
+
+  <div class="card normal-only" id="lobbyCard">
+    <h2><span class="num" style="background:#1f9fff">⚑</span> ロビー自動判定（戦闘中の誤検知対策）</h2>
+    <div class="warn" id="jpnWarn">日本語OCRデータ(jpn.traineddata)が見つかりません。下の手順で導入してください。</div>
+    <div class="chk"><input type="checkbox" id="el_lobby_gate" onchange="onGateToggle()"><span>ロビーにいる時だけ計測する</span><span class="tag">推奨</span></div>
+    <div class="hint">左上のタブ帯（ロビー / 倉庫 / オペレーター…）の文字が読めている時だけ資産を更新します。戦闘中はコンパスや座標しか出ないので、誤検知しなくなります。</div>
+    <div id="anchorArea" style="display:none">
+      <label style="margin-top:12px">上のプレビューの<b style="color:#1f9fff">青い点線枠</b>を、左上のタブ帯（ロビー 倉庫 …）に合わせてください</label>
+      <div class="row" style="justify-content:space-between;margin-top:10px;align-items:center">
+        <span class="hint" id="ocrText" style="font-family:'Courier New',monospace">読み取り: ---</span>
+        <span class="lobby-ind off" id="lobbyInd"><span class="ld"></span><span id="lobbyIndText">非検出</span></span>
+      </div>
+      <div class="hint" id="matchText" style="margin-top:4px">一致語: ---</div>
+      <div class="hint" style="margin-top:6px">判定方式：左上タブ帯に <b>「ロビー」「倉庫」「オペレーター」</b> のいずれかが読めていればロビーと判定します。戦闘中はOCRが背景を大量のゴミ文字にしますが、これらの実在単語は出ないため誤検知しません（実ログで確認済み）。文字数は参考表示のみで判定には使いません。</div>
+      <div class="chk" style="margin-top:10px"><input type="checkbox" id="el_lobby_debug" onchange="saveAll()"><span>OCRログを記録する（調査用）</span><span class="tag">CSV</span></div>
+      <div class="hint">ONの間、各フレームの読み取り内容を <b>このフォルダの lobby_debug.csv</b> に記録します。戦闘中に何の文字を何文字読んでいるかを後で確認できます。調査が終わったらOFFに。</div>
+      <div class="row" style="gap:14px;margin-top:10px;align-items:flex-start">
+        <div style="flex:1"><div class="hint" style="margin-bottom:4px">① 枠の中身（青枠が拾っている範囲）</div>
+          <img id="lobbyCrop" style="width:100%;border-radius:4px;image-rendering:pixelated;border:1px solid #30363d"></div>
+        <div style="flex:1"><div class="hint" style="margin-bottom:4px">② OCRに渡す画像（白地に黒文字が理想）</div>
+          <img id="lobbyProc" style="width:100%;border-radius:4px;image-rendering:pixelated;border:1px solid #30363d"></div>
+      </div>
+      <div class="hint" style="margin-top:8px">①にタブ文字がはっきり収まり、②で文字が黒くくっきり出ていれば読めます。ロビー↔戦闘を切り替えて、判定ランプの変化を確認してください。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗑 ログの削除</h2>
+    <div class="hint" style="margin-bottom:10px">配布前のリセットや調査ログのお掃除に。削除すると元に戻せません。次回計測時に自動で作り直されます。</div>
+    <div class="row">
+      <button class="btn red" onclick="clearAssetLog()">資産ログを削除</button>
+      <button class="btn red" onclick="clearOcrLog()">OCRログを削除</button>
+    </div>
+    <span class="hint" id="logMsg" style="display:block;margin-top:8px"></span>
+  </div>
+
+  <div class="savebar">
+    <button class="btn" onclick="saveAll()">保存</button>
+    <span id="saveMsg"></span>
+  </div>
+</div>
+
+<script>
+const pv=document.getElementById('pv');
+const roi=document.getElementById('roi');
+const handle=document.getElementById('roiHandle');
+const coords=document.getElementById('coords');
+let region={x:0.760,y:0.020,w:0.140,h:0.035};
+let anchor={x:0.050,y:0.015,w:0.450,h:0.038};
+let dragging=false,resizing=false,sx=0,sy=0,ox=0,oy=0,ow=0,oh=0;
+let aDragging=false,aResizing=false,asx=0,asy=0,aox=0,aoy=0,aow=0,aoh=0;
+let curStep=1;
+const TOTAL_STEPS=5;
+const STEP_NAMES=['','カメラ選択','読み取り範囲','読み取りテスト','開始資産','表示要素'];
+let manualChecks={obs:false,hud:false};
+
+function round3(v){return Math.round(v*1000)/1000}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
+function applyRegion(){
+  roi.style.left=(region.x*100)+'%';roi.style.top=(region.y*100)+'%';
+  roi.style.width=(region.w*100)+'%';roi.style.height=(region.h*100)+'%';
+  coords.textContent='x:'+region.x.toFixed(3)+' y:'+region.y.toFixed(3)+' w:'+region.w.toFixed(3)+' h:'+region.h.toFixed(3);
+}
+const anchorEl=document.getElementById('anchor');
+const anchorHandle=document.getElementById('anchorHandle');
+function applyAnchor(){
+  anchorEl.style.left=(anchor.x*100)+'%';anchorEl.style.top=(anchor.y*100)+'%';
+  anchorEl.style.width=(anchor.w*100)+'%';anchorEl.style.height=(anchor.h*100)+'%';
+}
+roi.addEventListener('mousedown',e=>{
+  if(e.target===handle)return;
+  dragging=true;sx=e.clientX;sy=e.clientY;ox=region.x;oy=region.y;e.preventDefault();
+});
+handle.addEventListener('mousedown',e=>{
+  resizing=true;sx=e.clientX;sy=e.clientY;ow=region.w;oh=region.h;e.stopPropagation();e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  const rect=pv.getBoundingClientRect();
+  if(dragging){region.x=round3(clamp(ox+(e.clientX-sx)/rect.width,0,1-region.w));region.y=round3(clamp(oy+(e.clientY-sy)/rect.height,0,1-region.h));applyRegion();}
+  else if(resizing){region.w=round3(clamp(ow+(e.clientX-sx)/rect.width,0.02,1-region.x));region.h=round3(clamp(oh+(e.clientY-sy)/rect.height,0.01,1-region.y));applyRegion();}
+});
+window.addEventListener('mouseup',()=>{dragging=false;resizing=false;});
+anchorEl.addEventListener('mousedown',e=>{
+  if(e.target===anchorHandle)return;
+  aDragging=true;asx=e.clientX;asy=e.clientY;aox=anchor.x;aoy=anchor.y;e.preventDefault();e.stopPropagation();
+});
+anchorHandle.addEventListener('mousedown',e=>{
+  aResizing=true;asx=e.clientX;asy=e.clientY;aow=anchor.w;aoh=anchor.h;e.stopPropagation();e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  const rect=pv.getBoundingClientRect();
+  if(aDragging){anchor.x=round3(clamp(aox+(e.clientX-asx)/rect.width,0,1-anchor.w));anchor.y=round3(clamp(aoy+(e.clientY-asy)/rect.height,0,1-anchor.h));applyAnchor();}
+  else if(aResizing){anchor.w=round3(clamp(aow+(e.clientX-asx)/rect.width,0.02,1-anchor.x));anchor.h=round3(clamp(aoh+(e.clientY-asy)/rect.height,0.01,1-anchor.y));applyAnchor();}
+});
+window.addEventListener('mouseup',()=>{aDragging=false;aResizing=false;});
+
+function refreshPreview(){
+  if(dragging||resizing)return;
+  const img=new Image();
+  img.onload=()=>{pv.style.backgroundImage='url('+img.src+')';document.getElementById('camWarn').classList.remove('show');};
+  img.onerror=()=>{document.getElementById('camWarn').classList.add('show');};
+  img.src='/preview?t='+Date.now();
+}
+setInterval(refreshPreview,1200);refreshPreview();
+
+document.getElementById('cam').addEventListener('change',async e=>{
+  await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({camera_index:parseInt(e.target.value)})});
+});
+
+async function detectCameras(){
+  const btn=document.getElementById('detectBtn');
+  const res=document.getElementById('camDetectResult');
+  btn.disabled=true;btn.textContent='検出中...';
+  try{
+    const d=await(await fetch('/cameras')).json();
+    if(d.cameras.length===0){res.textContent='⚠ 映像を返すカメラが見つかりません。OBSの仮想カメラを開始してください。';}
+    else{
+      res.textContent='✓ 検出: カメラ '+d.cameras.join(', ')+' — 映像が出ているものを選んでください';
+      document.getElementById('cam').value=d.cameras[0];
+      await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({camera_index:d.cameras[0]})});
+    }
+  }catch(e){res.textContent='エラー: サーバーに接続できません';}
+  btn.disabled=false;btn.textContent='🔍 自動検出';
+}
+
+async function ocrTest(){
+  const box=document.getElementById('testResult');
+  box.className='result show';box.innerHTML='読み取り中...';
+  await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ocr_region:region})});
+  await new Promise(r=>setTimeout(r,1400));
+  try{
+    const d=await(await fetch('/ocr_test')).json();
+    if(d.msg){box.innerHTML='<span class="ng-text">'+d.msg+'</span>';return;}
+    if(d.ok){box.innerHTML='<span class="ok-text">'+d.value_fmt+' ✓</span><div class="hint" style="margin-top:4px">認識文字: "'+d.raw+'"</div><img src="'+d.crop+'">';}
+    else{box.innerHTML='<span class="ng-text">読み取り失敗</span><div class="hint" style="margin-top:4px">認識文字: "'+d.raw+'" — 枠を数字に合わせ直してください</div><img src="'+d.crop+'">';}
+  }catch(e){box.innerHTML='<span class="ng-text">エラー: サーバーに接続できません</span>';}
+}
+
+async function setStart(){
+  await fetch('/reset',{method:'POST'});
+  document.getElementById('startMsg').textContent='✓ 開始資産をセットしました';
+  setTimeout(()=>{document.getElementById('startMsg').textContent='配信開始時に押すと、そこからの収支を計算します';},2500);
+}
+
+async function saveAll(){
+  const body={camera_index:parseInt(document.getElementById('cam').value),ocr_region:region,lobby_anchor:anchor,
+    elements:{gain:{enabled:document.getElementById('el_gain').checked,fx:document.getElementById('el_fx').checked},
+      logo:{enabled:document.getElementById('el_logo').checked},banner:{enabled:false,mode:"sponsor"},
+      lobby_gate:{enabled:document.getElementById('el_lobby_gate').checked,debug:document.getElementById('el_lobby_debug').checked}}};
+  await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const msg=document.getElementById('saveMsg');msg.textContent='✓ 保存しました';
+  setTimeout(()=>{msg.textContent='';},2500);
+}
+
+// ロビーゲート: トグル・ライブOCR表示
+function onGateToggle(){
+  const on=document.getElementById('el_lobby_gate').checked;
+  document.getElementById('anchorArea').style.display=on?'block':'none';
+  document.body.classList.toggle('show-anchor',on);
+  if(on)applyAnchor();
+  fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lobby_anchor:anchor,elements:{lobby_gate:{enabled:on}}})});
+}
+async function refreshLobbyStatus(){
+  if(!document.getElementById('el_lobby_gate').checked)return;
+  try{
+    const d=await(await fetch('/lobby_status')).json();
+    document.getElementById('jpnWarn').classList.toggle('show',d.jpn===false);
+    document.getElementById('ocrText').textContent='読み取り: '+(d.text||'---');
+    document.getElementById('matchText').textContent='一致語: '+(d.word?d.word:'なし')+'（参考: 文字数'+(d.jp_count!=null?d.jp_count:'-')+'）';
+    if(d.crop)document.getElementById('lobbyCrop').src=d.crop;
+    if(d.proc)document.getElementById('lobbyProc').src=d.proc;
+    const ind=document.getElementById('lobbyInd');
+    ind.className='lobby-ind '+(d.in_lobby?'on':'off');
+    document.getElementById('lobbyIndText').textContent=d.in_lobby?'ロビー検出中':'非検出';
+  }catch(e){}
+}
+setInterval(refreshLobbyStatus,1200);
+
+async function loadStartupStatus(){
+  try{
+    const d=await(await fetch('/startup/status')).json();
+    document.getElementById('startupToggle').checked=d.registered;
+    document.getElementById('startupHint').textContent=d.registered?'✓ 登録済み — PC 起動時に自動起動します':'PC 起動時に HUD サーバーを自動起動します';
+  }catch(e){}
+}
+async function toggleStartup(){
+  const on=document.getElementById('startupToggle').checked;
+  const hint=document.getElementById('startupHint');
+  try{
+    if(on){const d=await(await fetch('/startup',{method:'POST'})).json();hint.textContent=d.ok?'✓ 登録しました':'⚠ 登録失敗: '+d.msg;}
+    else{const d=await(await fetch('/startup',{method:'DELETE'})).json();hint.textContent=d.ok?'解除しました':'⚠ 解除失敗: '+d.msg;}
+  }catch(e){hint.textContent='エラー: サーバーに接続できません';}
+}
+
+function showStep(n){
+  curStep=n;
+  document.querySelectorAll('.card[data-step]').forEach(c=>c.classList.remove('active'));
+  document.querySelector('.card[data-step="'+n+'"]').classList.add('active');
+  document.getElementById('wizardStep').textContent='STEP '+n+' / '+TOTAL_STEPS+' — '+STEP_NAMES[n];
+}
+function nextStep(){if(curStep<TOTAL_STEPS)showStep(curStep+1);}
+function prevStep(){if(curStep>1)showStep(curStep-1);}
+function skipWizard(){document.body.classList.remove('wizard');document.querySelectorAll('.card[data-step]').forEach(c=>c.classList.add('active'));}
+async function finishWizard(){await saveAll();await fetch('/wizard_done',{method:'POST'});document.body.classList.remove('wizard');document.querySelectorAll('.card[data-step]').forEach(c=>c.classList.add('active'));}
+function restartWizard(){document.body.classList.add('wizard');document.querySelectorAll('.card[data-step]').forEach(c=>c.classList.remove('active'));showStep(1);}
+
+async function refreshProgress(){
+  try{
+    const h=await(await fetch('/health')).json();
+    setChip('camera',h.camera);setChip('ocr',h.ocr);setChip('start',h.start);
+    setChip('tesseract',h.tesseract);setChip('jpn',h.jpn);
+    document.getElementById('helpTesseract').classList.toggle('show',!h.tesseract);
+  }catch(e){}
+}
+function showDepHelp(key){
+  document.getElementById('helpTesseract').classList.toggle('show',key==='tesseract');
+  document.getElementById('helpJpn').classList.toggle('show',key==='jpn');
+}
+function setChip(key,ok){
+  const el=document.querySelector('.pchip[data-key="'+key+'"]');
+  if(!el)return;el.classList.toggle('ok',ok);el.classList.toggle('ng',!ok);
+}
+function toggleManual(key){manualChecks[key]=!manualChecks[key];setChip(key,manualChecks[key]);}
+setInterval(refreshProgress,2000);refreshProgress();
+
+async function loadCurrent(){
+  try{
+    const s=await(await fetch('/settings')).json();
+    document.getElementById('cam').value=s.camera_index;
+    region=s.ocr_region;applyRegion();
+    document.getElementById('el_gain').checked=s.elements.gain.enabled;
+    document.getElementById('el_fx').checked=s.elements.gain.fx;
+    document.getElementById('el_logo').checked=s.elements.logo.enabled;
+    if(s.lobby_anchor){anchor=s.lobby_anchor;applyAnchor();}
+    const lg=(s.elements&&s.elements.lobby_gate)||{enabled:false};
+    document.getElementById('el_lobby_gate').checked=lg.enabled;document.getElementById('el_lobby_debug').checked=!!lg.debug;
+    document.getElementById('anchorArea').style.display=lg.enabled?'block':'none';
+    document.body.classList.toggle('show-anchor',lg.enabled);
+    if(!s.first_run_done){document.body.classList.add('wizard');showStep(1);}
+    else{document.body.classList.remove('wizard');document.querySelectorAll('.card[data-step]').forEach(c=>c.classList.add('active'));}
+  }catch(e){applyRegion();}
+  loadStartupStatus();
+}
+async function clearAssetLog(){
+  if(!confirm('資産ログ(session_log.jsonl)を削除します。元に戻せません。よろしいですか？'))return;
+  try{const d=await(await fetch('/sessions',{method:'DELETE'})).json();
+    document.getElementById('logMsg').textContent=d.ok?'✓ 資産ログを削除しました':'⚠ 削除に失敗しました';
+  }catch(e){document.getElementById('logMsg').textContent='⚠ 削除に失敗しました';}
+}
+async function clearOcrLog(){
+  if(!confirm('OCRログ(lobby_debug.csv)を削除します。元に戻せません。よろしいですか？'))return;
+  try{const d=await(await fetch('/lobby_debug',{method:'DELETE'})).json();
+    document.getElementById('logMsg').textContent=d.ok?'✓ OCRログを削除しました':'⚠ 削除に失敗しました';
+  }catch(e){document.getElementById('logMsg').textContent='⚠ 削除に失敗しました';}
+}
+loadCurrent();
+</script>
+</body>
+</html>
