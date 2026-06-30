@@ -34,6 +34,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
 td.pos{color:#3fb950}td.neg{color:#f85149}
 .empty{text-align:center;padding:40px;color:#8b949e;font-size:14px}
 .range-note{font-size:12px;color:#8b949e;padding:8px 16px;border-top:1px solid #21262d}
+.segment{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.segment .label{font-size:12px;color:#8b949e}
+.segment .value{font-size:18px;font-weight:700;font-family:'Courier New',monospace}
+.segment .value.pos{color:#3fb950}.segment .value.neg{color:#f85149}.segment .value.neu{color:#8b949e}
 </style>
 </head>
 <body>
@@ -41,9 +45,17 @@ td.pos{color:#3fb950}td.neg{color:#f85149}
   <div class="topbar">
     <h1>📊 セッション履歴</h1>
     <a href="/setup">← 設定に戻る</a>
+    <button class="btn blue" onclick="cutHere()">ここで区切る</button>
     <button class="btn blue" onclick="loadData()">🔄 更新</button>
     <button class="btn" onclick="exportCSV()">⬇ CSV出力</button>
     <button class="btn red" onclick="clearLog()">🗑 ログ削除</button>
+  </div>
+  <div class="segment">
+    <div>
+      <div class="label">前回カットから</div>
+      <div class="value neu" id="segmentNet">---</div>
+    </div>
+    <div class="label" id="segmentNote">確認中...</div>
   </div>
   <div class="stats" id="stats">
     <div class="stat"><div class="label">セッション開始</div><div class="value neu" id="s-start">---</div></div>
@@ -65,6 +77,35 @@ let allEntries=[];
 function fmtVal(v){if(v==null)return'---';const a=Math.abs(v);if(a>=1e9)return(v/1e9).toFixed(2)+'B';if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return(v/1e3).toFixed(1)+'K';return String(parseInt(v));}
 function fmtGain(v){if(v==null)return'---';const s=v>0?'+':v<0?'-':'';return s+fmtVal(Math.abs(v));}
 function fmtTime(iso){try{return iso.replace('T',' ');}catch(e){return iso;}}
+function setSegmentMessage(text, cls, note){
+  const netEl=document.getElementById('segmentNet'),noteEl=document.getElementById('segmentNote');
+  netEl.textContent=text;netEl.className='value '+(cls||'neu');noteEl.textContent=note||'';
+}
+async function loadCurrentSegment(){
+  try{
+    const d=await(await fetch('/current_segment')).json();
+    if(d.net!=null){
+      const cls=d.net>0?'pos':d.net<0?'neg':'neu';
+      setSegmentMessage(fmtGain(d.net),cls,'現在残高: '+fmtVal(d.current_balance));
+    }else if(d.current_balance!=null){
+      setSegmentMessage('---','neu','まだ区切っていません（現在残高: '+fmtVal(d.current_balance)+'）');
+    }else{
+      setSegmentMessage('---','neu','残高未取得');
+    }
+  }catch(e){
+    setSegmentMessage('---','neu','現在区間を取得できません');
+  }
+}
+async function cutHere(){
+  try{
+    const res=await fetch('/cut',{method:'POST'});
+    const d=await res.json();
+    if(!res.ok){alert(d.message||'区切りに失敗しました');return;}
+    await loadCurrentSegment();
+  }catch(e){
+    alert('区切りに失敗しました');
+  }
+}
 async function loadData(){
   try{
     const d=await(await fetch('/sessions')).json();
@@ -126,10 +167,8 @@ function renderTable(){
 }
 function exportCSV(){
   if(!allEntries.length){alert('データがありません');return;}
-  let csv='datetime,value
-';
-  allEntries.forEach(e=>{csv+=e.t+','+e.v+'
-';});
+  let csv='datetime,value\n';
+  allEntries.forEach(e=>{csv+=e.t+','+e.v+'\n';});
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
   a.download='delta_force_session_'+new Date().toISOString().slice(0,10)+'.csv';
@@ -141,6 +180,8 @@ async function clearLog(){
 }
 window.addEventListener('resize',()=>{if(allEntries.length)drawChart();});
 loadData();
+loadCurrentSegment();
+setInterval(loadCurrentSegment,5000);
 </script>
 </body>
 </html>

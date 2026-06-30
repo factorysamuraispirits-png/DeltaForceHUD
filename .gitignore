@@ -8,6 +8,7 @@ __pycache__/
 settings.json
 session_log.jsonl
 lobby_debug.csv
+markers.jsonl
 
 logs/
 captures/

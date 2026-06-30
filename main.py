@@ -6,6 +6,7 @@ import uvicorn
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 SESSION_LOG   = os.path.join(BASE_DIR, "session_log.jsonl")
+MARKERS_LOG   = os.path.join(BASE_DIR, "markers.jsonl")
 LOBBY_DEBUG_LOG = os.path.join(BASE_DIR, "lobby_debug.csv")
 SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
 
@@ -516,6 +517,101 @@ def list_cameras():
                 found.append(i)
             cap.release()
     return {"cameras": found}
+
+
+def get_stable_balance():
+    entries = []
+    try:
+        with open(SESSION_LOG, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    if isinstance(item.get("v"), int):
+                        entries.append(item)
+                except Exception:
+                    continue
+    except FileNotFoundError:
+        return None
+
+    if not entries:
+        return None
+
+    values = [item["v"] for item in entries[-5:]]
+    if len(values) < 3:
+        return values[-1]
+    if values[-1] == values[-2] == values[-3]:
+        return values[-1]
+
+    counts = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    best = values[-1]
+    for value in reversed(values):
+        if counts[value] > counts[best]:
+            best = value
+    return best
+
+
+def get_last_marker():
+    last = None
+    try:
+        with open(MARKERS_LOG, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    if isinstance(item.get("balance"), int):
+                        last = item
+                except Exception:
+                    continue
+    except FileNotFoundError:
+        return None
+    return last
+
+
+@app.post("/cut")
+def cut_segment():
+    balance = get_stable_balance()
+    if balance is None:
+        return Response(
+            json.dumps({"ok": False, "error": "balance_unavailable", "message": "残高未取得"}, ensure_ascii=False),
+            status_code=409,
+            media_type="application/json")
+
+    marker = {
+        "t": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "balance": balance,
+        "type": "manual"
+    }
+    try:
+        with open(MARKERS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(marker, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print("[cutエラー] " + str(e))
+        return Response(
+            json.dumps({"ok": False, "error": "marker_write_failed", "message": str(e)}, ensure_ascii=False),
+            status_code=500,
+            media_type="application/json")
+    return {"ok": True, "marker": marker}
+
+
+@app.get("/current_segment")
+def current_segment():
+    last_marker = get_last_marker()
+    current_balance = get_stable_balance()
+    net = None
+    if last_marker is not None and current_balance is not None:
+        net = current_balance - last_marker["balance"]
+    return {
+        "last_marker": last_marker,
+        "current_balance": current_balance,
+        "net": net
+    }
 
 
 @app.get("/sessions")
