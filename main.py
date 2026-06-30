@@ -263,6 +263,7 @@ def ocr_loop():
     fail_cnt = 0
     MAX_FAILS = 5
     pending  = {"val": None, "count": 0}
+    prev_logged_v = None
     # ロビー判定スムージング（直近数フレームの移動窓でチラつき吸収）
     gate_open       = True
     lobby_window    = []
@@ -351,13 +352,16 @@ def ocr_loop():
                     if state["start"] is not None:
                         state["gain"] = val - state["start"]
 
-                    if s.get("session", {}).get("log", True):
+                    if (s.get("session", {}).get("log", True)
+                            and (prev_logged_v is None
+                                 or (gate_open == 1 and val != prev_logged_v))):
                         try:
                             with open(SESSION_LOG, "a", encoding="utf-8") as lf:
                                 lf.write(json.dumps({
                                     "t": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
                                     "v": val
                                 }) + "\n")
+                            prev_logged_v = val
                         except Exception:
                             pass
 
