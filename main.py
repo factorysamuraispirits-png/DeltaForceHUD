@@ -1,4 +1,4 @@
-import cv2, numpy as np, pytesseract, time, re, json, threading, os, base64, csv
+import cv2, numpy as np, pytesseract, time, re, json, threading, os, base64, csv, hashlib
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
@@ -6,7 +6,6 @@ import uvicorn
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 SESSION_LOG   = os.path.join(BASE_DIR, "session_log.jsonl")
-MARKERS_LOG   = os.path.join(BASE_DIR, "markers.jsonl")
 LOBBY_DEBUG_LOG = os.path.join(BASE_DIR, "lobby_debug.csv")
 SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
 
@@ -50,6 +49,16 @@ def deep_merge(base, override):
     return out
 
 
+def deep_merge_update(base, patch):
+    """baseに対しpatchを再帰的に適用。dict以外はpatch優先で上書き。"""
+    for k, v in patch.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            base[k] = deep_merge_update(base[k], v)
+        else:
+            base[k] = v
+    return base
+
+
 def load_settings():
     global _s_mtime, _s_cache
     with _settings_lock:
@@ -82,16 +91,16 @@ def write_settings(s):
 
 state = {
     "raw": "", "value": 0, "start": None, "gain": 0,
-    "updated": "", "running": False, "last_frame_ts": 0.0, "in_lobby": True
+    "updated": "", "running": False, "last_frame_ts": 0.0, "in_lobby": True,
+    "last_frame_hash": None, "last_changed_ts": 0.0,
+    "frame_frozen": False, "reconnect_cooldown_until": 0.0
 }
 shared = {"frame": None}
 
 
 def parse(text):
     t = re.sub(r'[^0-9.,KMBkmb]', '', text).upper()
-    t = re.sub(r'(\d+)[,.](\d{3})([KMB])', r'\1\2\3', t)
     t = t.replace(',', '')
-    # [変更] 単位(K/M/B)必須。戦闘中の座標(単位なし)を誤検知しないため
     m = re.match(r'(\d+\.?\d*)([KMB])', t)
     if not m:
         return None
@@ -262,8 +271,13 @@ def ocr_loop():
     cur_idx  = -1
     fail_cnt = 0
     MAX_FAILS = 5
+    UI_FREEZE_SEC = 5
+    RECONNECT_FREEZE_SEC = 10
+    COOLDOWN_SEC = 30
+    MAX_RECONNECT_ATTEMPTS = 2
+    reconnect_attempts = 0
+    freeze_reopen_pending = False
     pending  = {"val": None, "count": 0}
-    prev_logged_v = None
     # ロビー判定スムージング（直近数フレームの移動窓でチラつき吸収）
     gate_open       = True
     lobby_window    = []
@@ -276,6 +290,7 @@ def ocr_loop():
             idx = s.get("camera_index", 1)
 
             if cap is None or not cap.isOpened() or idx != cur_idx:
+                reset_freeze_tracking = cur_idx == -1 or idx != cur_idx
                 if cap is not None:
                     cap.release()
                 cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
@@ -283,6 +298,12 @@ def ocr_loop():
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
                 cur_idx  = idx
                 fail_cnt = 0
+                if reset_freeze_tracking:
+                    reconnect_attempts = 0
+                    freeze_reopen_pending = False
+                    state["last_frame_hash"] = None
+                    state["last_changed_ts"] = time.time()
+                    state["frame_frozen"] = False
                 time.sleep(0.5)
                 continue
 
@@ -298,9 +319,44 @@ def ocr_loop():
                 continue
 
             fail_cnt = 0
+            now = time.time()
+
+            small = cv2.resize(frame, (64, 36), interpolation=cv2.INTER_AREA)
+            gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+            frame_hash = hashlib.md5(gray.tobytes()).hexdigest()
+
+            if frame_hash != state["last_frame_hash"]:
+                was_frozen = state["frame_frozen"]
+                state["last_frame_hash"] = frame_hash
+                state["last_changed_ts"] = now
+                state["frame_frozen"] = False
+                # 再オープン後の最初のhash変化だけを無視する。複数回変化する環境ではこの前提を再検証する。
+                if freeze_reopen_pending:
+                    freeze_reopen_pending = False
+                else:
+                    reconnect_attempts = 0
+                if was_frozen:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] カメラ映像の変化が復帰")
+            else:
+                frozen_duration = now - state["last_changed_ts"]
+                if frozen_duration >= UI_FREEZE_SEC and not state["frame_frozen"]:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] カメラ映像の凍結を検知")
+                state["frame_frozen"] = frozen_duration >= UI_FREEZE_SEC
+                if (frozen_duration >= RECONNECT_FREEZE_SEC
+                        and now >= state["reconnect_cooldown_until"]
+                        and reconnect_attempts < MAX_RECONNECT_ATTEMPTS):
+                    reconnect_attempts += 1
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] カメラ再接続 {reconnect_attempts}/{MAX_RECONNECT_ATTEMPTS}")
+                    cap.release()
+                    cap = None
+                    freeze_reopen_pending = True
+                    state["reconnect_cooldown_until"] = now + COOLDOWN_SEC
+                    state["last_changed_ts"] = now
+                    continue
+
             with _frame_lock:
                 shared["frame"] = frame.copy()
-            state["last_frame_ts"] = time.time()
+            state["last_frame_ts"] = now
 
             # ロビー判定ゲート（タブ帯OCR + ヒステリシス）
             gate = s.get("elements", {}).get("lobby_gate", {})
@@ -352,16 +408,13 @@ def ocr_loop():
                     if state["start"] is not None:
                         state["gain"] = val - state["start"]
 
-                    if (s.get("session", {}).get("log", True)
-                            and (prev_logged_v is None
-                                 or (gate_open == 1 and val != prev_logged_v))):
+                    if s.get("session", {}).get("log", True):
                         try:
                             with open(SESSION_LOG, "a", encoding="utf-8") as lf:
                                 lf.write(json.dumps({
                                     "t": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
                                     "v": val
                                 }) + "\n")
-                            prev_logged_v = val
                         except Exception:
                             pass
 
@@ -393,7 +446,7 @@ def asset():
 def health():
     now = time.time()
     return {
-        "camera": (now - state["last_frame_ts"]) < 5,
+        "camera": (now - state.get("last_changed_ts", 0)) < 5 and not state.get("frame_frozen", False),
         "ocr":    bool(state["updated"]) and state["value"] > 0,
         "start":  state["start"] is not None,
         "tesseract": os.path.exists(pytesseract.pytesseract.tesseract_cmd),
@@ -410,7 +463,7 @@ def get_settings():
 async def post_settings(request: Request):
     data = await request.json()
     cur  = load_settings()
-    write_settings(deep_merge(cur, data))
+    write_settings(deep_merge_update(cur, data))
     return {"ok": True}
 
 
@@ -521,101 +574,6 @@ def list_cameras():
                 found.append(i)
             cap.release()
     return {"cameras": found}
-
-
-def get_stable_balance():
-    entries = []
-    try:
-        with open(SESSION_LOG, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                    if isinstance(item.get("v"), int):
-                        entries.append(item)
-                except Exception:
-                    continue
-    except FileNotFoundError:
-        return None
-
-    if not entries:
-        return None
-
-    values = [item["v"] for item in entries[-5:]]
-    if len(values) < 3:
-        return values[-1]
-    if values[-1] == values[-2] == values[-3]:
-        return values[-1]
-
-    counts = {}
-    for value in values:
-        counts[value] = counts.get(value, 0) + 1
-    best = values[-1]
-    for value in reversed(values):
-        if counts[value] > counts[best]:
-            best = value
-    return best
-
-
-def get_last_marker():
-    last = None
-    try:
-        with open(MARKERS_LOG, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                    if isinstance(item.get("balance"), int):
-                        last = item
-                except Exception:
-                    continue
-    except FileNotFoundError:
-        return None
-    return last
-
-
-@app.post("/cut")
-def cut_segment():
-    balance = get_stable_balance()
-    if balance is None:
-        return Response(
-            json.dumps({"ok": False, "error": "balance_unavailable", "message": "残高未取得"}, ensure_ascii=False),
-            status_code=409,
-            media_type="application/json")
-
-    marker = {
-        "t": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "balance": balance,
-        "type": "manual"
-    }
-    try:
-        with open(MARKERS_LOG, "a", encoding="utf-8") as f:
-            f.write(json.dumps(marker, ensure_ascii=False) + "\n")
-    except Exception as e:
-        print("[cutエラー] " + str(e))
-        return Response(
-            json.dumps({"ok": False, "error": "marker_write_failed", "message": str(e)}, ensure_ascii=False),
-            status_code=500,
-            media_type="application/json")
-    return {"ok": True, "marker": marker}
-
-
-@app.get("/current_segment")
-def current_segment():
-    last_marker = get_last_marker()
-    current_balance = get_stable_balance()
-    net = None
-    if last_marker is not None and current_balance is not None:
-        net = current_balance - last_marker["balance"]
-    return {
-        "last_marker": last_marker,
-        "current_balance": current_balance,
-        "net": net
-    }
 
 
 @app.get("/sessions")
