@@ -1,15 +1,27 @@
 import cv2, numpy as np, pytesseract, time, re, json, threading, os, base64, csv, hashlib
+import sys
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 import uvicorn
+
+
+def resource_path(relative_path: str) -> str:
+    """開発時・PyInstaller exe時 両対応で絶対パスを返す。"""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative_path)
+
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 SESSION_LOG   = os.path.join(BASE_DIR, "session_log.jsonl")
 LOBBY_DEBUG_LOG = os.path.join(BASE_DIR, "lobby_debug.csv")
 SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if hasattr(sys, "_MEIPASS"):
+    # TODO(②A): .spec の同梱先を Tesseract-OCR/tesseract.exe に揃える。
+    pytesseract.pytesseract.tesseract_cmd = resource_path("Tesseract-OCR/tesseract.exe")
+else:
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 DEFAULT_SETTINGS = {
     "profile": "delta_force",
@@ -136,7 +148,7 @@ def crop_region(frame, r):
 
 
 # ロビー判定 — 左上タブ帯を日本語OCRで読み、メニュー画面を検出
-PROJECT_TESSDATA = os.path.join(BASE_DIR, "tessdata")
+PROJECT_TESSDATA = resource_path("tessdata")
 # メニュー画面はタブ単語が画面ごとに異なるため、特定語ではなく
 # 「日本語文字数」で判定する（メニュー=多い / 戦闘=ほぼ無い）。
 # しきい値は settings の elements.lobby_gate.min_chars で調整可能（既定8）
@@ -260,6 +272,7 @@ def run_ocr(roi):
     gray = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
     _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     cfg = '--oem 1 --psm 6 -c tessedit_char_whitelist=0123456789.,KMBkmb'
+    cfg += " --tessdata-dir " + PROJECT_TESSDATA.replace("\\", "/")
     try:
         return pytesseract.image_to_string(th, config=cfg).strip()
     except Exception:
@@ -478,7 +491,7 @@ def wizard_done():
 @app.get("/logo")
 def logo():
     """ロゴ画像を動的に配信（install.py 再実行なしでロゴ変更可能）"""
-    path = os.path.join(BASE_DIR, "assets", "logo.png")
+    path = resource_path("assets/logo.png")
     try:
         with open(path, "rb") as f:
             data = f.read()
