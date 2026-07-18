@@ -2,7 +2,7 @@ import cv2, numpy as np, pytesseract, time, re, json, threading, os, base64, csv
 import sys
 from datetime import datetime
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 import uvicorn
 
 
@@ -14,6 +14,7 @@ def resource_path(relative_path: str) -> str:
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 SESSION_LOG   = os.path.join(BASE_DIR, "session_log.jsonl")
+MARKERS_LOG   = os.path.join(BASE_DIR, "markers.jsonl")
 LOBBY_DEBUG_LOG = os.path.join(BASE_DIR, "lobby_debug.csv")
 SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
 
@@ -604,6 +605,52 @@ def get_sessions():
     except FileNotFoundError:
         pass
     return {"entries": entries[-1000:]}
+
+
+@app.post("/cut")
+def cut():
+    balance = state["value"]
+    if not balance:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "message": "残高が未取得のため区切れません"},
+        )
+
+    t = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        with open(MARKERS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"t": t, "balance": balance}, ensure_ascii=False) + "\n")
+    except Exception:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "message": "区切りの保存に失敗しました"},
+        )
+    return {"ok": True, "balance": balance, "t": t}
+
+
+@app.get("/current_segment")
+def get_current_segment():
+    try:
+        marker = None
+        try:
+            with open(MARKERS_LOG, encoding="utf-8") as f:
+                lines = [line.strip() for line in f if line.strip()]
+            if lines:
+                marker = json.loads(lines[-1])
+        except FileNotFoundError:
+            pass
+
+        current_balance = state["value"] if state["value"] else None
+        if current_balance is None:
+            return {"net": None, "current_balance": None}
+        if marker is None:
+            return {"net": None, "current_balance": current_balance}
+        return {
+            "net": current_balance - marker["balance"],
+            "current_balance": current_balance,
+        }
+    except Exception:
+        return {"net": None, "current_balance": None}
 
 
 @app.delete("/sessions")
