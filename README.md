@@ -1,6 +1,6 @@
 # DeltaForceHUD
 
-> **OpenAI Build Week 2026 submission.** DeltaForceHUD is a local OCR overlay that reads *only your own screen* to show real-time asset gain/loss for extraction-shooter streamers — no game memory access, no network modification, nothing an anti-cheat would flag. Built with a Human + Claude + Codex loop: Claude writes the spec/instruction doc, Codex (GPT‑5.6) implements, Claude reviews the diff, the human approves and commits.
+> **OpenAI Build Week 2026 submission.** DeltaForceHUD is a local OCR overlay that reads *only your own screen* to show real-time asset gain/loss for extraction-shooter streamers — without accessing game memory or modifying network traffic. Built with a Human + Claude + Codex loop: Claude writes the spec/instruction doc, Codex (GPT‑5.6) implements, Claude reviews the diff, and the human approves and commits.
 
 ## Try it without the game (for judges)
 
@@ -26,6 +26,7 @@ DeltaForceHUD は、ローカルPC上で動作するOBS向けHUD補助ツール�
 - `setup.html`
 - `requirements.txt`
 - `start.bat`
+- `LICENSE`
 - `assets/logo.png`
 - ドキュメント類
 
