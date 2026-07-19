@@ -1,5 +1,21 @@
 # DeltaForceHUD
 
+> **OpenAI Build Week 2026 submission.** DeltaForceHUD is a local OCR overlay that reads *only your own screen* to show real-time asset gain/loss for extraction-shooter streamers — no game memory access, no network modification, nothing an anti-cheat would flag. Built with a Human + Claude + Codex loop: Claude writes the spec/instruction doc, Codex (GPT‑5.6) implements, Claude reviews the diff, the human approves and commits.
+
+## Try it without the game (for judges)
+
+You do **not** need Delta Force to verify the tool works:
+
+1. Install deps and start the server (see セットアップ概要 / 起動 below).
+2. Open `http://localhost:8765/health` → confirms the server and OCR loop are alive.
+3. Open `http://localhost:8765/setup` → the setup wizard; pick a capture device and draw the OCR region in the browser, no code needed.
+4. `GET http://localhost:8765/ocr_test` → runs OCR on the current frame and returns the parsed value, so you can confirm the read path end‑to‑end against any screen.
+5. `http://localhost:8765/log` → session history + "cut here" segment tracking (the feature built during Build Week).
+
+**How AI was used:** design/review by Claude, implementation by Codex on GPT‑5.6. During the "cut / segment" feature, Claude's diff review caught a real bug — the error‑path HTTP status did not match the front‑end's branching — and a follow‑up instruction doc had Codex fix it. Human role = final approval + commit only.
+
+---
+
 DeltaForceHUD は、ローカルPC上で動作するOBS向けHUD補助ツールです。FastAPIでローカルサーバーを起動し、OBSには `http://localhost:8765/` を表示元として登録します。
 
 ## Git管理するもの
