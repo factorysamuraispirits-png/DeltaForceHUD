@@ -1,10 +1,10 @@
 <!-- BEGIN GENERATED: factory-mo-ai-instructions | source=factory-samurai-docs | commit=32c868c8b533f1abfad0e55e74543d24354281fb | tool=sync-ai-instructions.mjs | DO NOT EDIT INSIDE THIS BLOCK -->
-# AGENTS.md
+# CLAUDE.md
 
 GENERATED FILE — DO NOT EDIT
 手編集禁止
 SOURCE: Factory-mo Coding Principles v0.1; Factory-mo AI Implementation Protocol v0.1
-TOOL HEADER: AGENTS.md
+TOOL HEADER: CLAUDE.md
 
 ## Coding Principles
 
@@ -138,37 +138,3 @@ Planには目的、変更対象、変更しない対象、予想影響、検証�
 
 本Protocolの対象外で既存SSoTが存在する事項は、最新版の該当正本に従う。参照先の内容を本書へコピーして独立管理しない。既存SSoT側でbreaking changeが行われた場合、そのpublisherがchangelogのCHANGE TYPEおよびREFERENCE IMPACTで影響を明示する。
 <!-- END GENERATED: factory-mo-ai-instructions -->
-
-# AGENTS
-
-このファイルは、`DeltaForceHUD` プロジェクトで作業するAIエージェント向けの共通ルールです。
-
-## 基本姿勢
-
-このプロジェクトは、OBS向けHUDとOCR補助ツールを含むローカル実行アプリです。作業時は、既存の動作を壊さないこと、実ログや個人設定をGitに混ぜないこと、無料ローカル運用を前提にすることを最優先にします。
-
-## Git初期化ルール
-
-- 親フォルダではなく、必ずこのフォルダ直下で作業する。
-- 既存の `.git` がある場合は `git init` しない。
-- `git add` と `commit` の前に、追跡対象を人間に提示して承認を得る。
-- `git push`、GitHub連携、branch作成、tag作成、release作成は行わない。
-- ファイル削除、リネーム、自動フォーマット、自動修正は勝手に行わない。
-
-## Gitに入れないもの
-
-- `venv/`
-- `settings.json`
-- `session_log.jsonl`
-- `lobby_debug.csv`
-- `tessdata/*.traineddata`
-- 録画、キャプチャ、ログ、配布用zip
-- `.env` や秘密情報を含む可能性のあるファイル
-
-## 修正ルール
-
-既存コードを修正する前に、影響範囲を確認します。特に `main.py`、`start.bat`、`setup.html`、`install.py` の絶対パス変更は、起動手順やユーザー案内に影響するため、差分と壊れる可能性を説明してから最小限に変更します。
-
-## セキュリティ
-
-初回コミット前に、可能な限りローカルの無料ツールで秘密情報スキャンを行います。課金サービス、外部API、クラウドリソース、GitHub公開操作は、管理者の明示承認なしに実行しません。
