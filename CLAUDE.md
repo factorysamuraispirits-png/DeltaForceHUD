@@ -1,9 +1,9 @@
-<!-- BEGIN GENERATED: factory-mo-ai-instructions | source=factory-samurai-docs | commit=32c868c8b533f1abfad0e55e74543d24354281fb | tool=sync-ai-instructions.mjs | DO NOT EDIT INSIDE THIS BLOCK -->
+<!-- BEGIN GENERATED: factory-mo-ai-instructions | source=factory-samurai-docs | commit=8047842bf050d6af147212a6781a5a7a31e1ccd0 | tool=sync-ai-instructions.mjs | DO NOT EDIT INSIDE THIS BLOCK -->
 # CLAUDE.md
 
 GENERATED FILE — DO NOT EDIT
 手編集禁止
-SOURCE: Factory-mo Coding Principles v0.1; Factory-mo AI Implementation Protocol v0.1
+SOURCE: Factory-mo Coding Principles v0.1; Factory-mo AI Implementation Protocol v0.1.1
 TOOL HEADER: CLAUDE.md
 
 ## Coding Principles
