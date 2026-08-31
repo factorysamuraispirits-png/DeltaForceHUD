@@ -1,9 +1,9 @@
-<!-- BEGIN GENERATED: factory-mo-ai-instructions | source=factory-samurai-docs | commit=8047842bf050d6af147212a6781a5a7a31e1ccd0 | tool=sync-ai-instructions.mjs | DO NOT EDIT INSIDE THIS BLOCK -->
+<!-- BEGIN GENERATED: factory-mo-ai-instructions | source=factory-samurai-docs | commit=bee450b6b1dc5f090d47d97cd6a101db32a684b1 | tool=sync-ai-instructions.mjs | DO NOT EDIT INSIDE THIS BLOCK -->
 # AGENTS.md
 
 GENERATED FILE — DO NOT EDIT
 手編集禁止
-SOURCE: Factory-mo Coding Principles v0.1; Factory-mo AI Implementation Protocol v0.1.1
+SOURCE: Factory-mo Coding Principles v0.1; Factory-mo AI Implementation Protocol v0.1.2
 TOOL HEADER: AGENTS.md
 
 ## Coding Principles
